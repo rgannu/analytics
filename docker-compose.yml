@@ -1,0 +1,102 @@
+version: "3.7"
+services:
+  zookeeper:
+    hostname: zookeeper
+    image: debezium/zookeeper:${DEBEZIUM_ZK_VERSION}
+    ports:
+      - 2181:2181
+      - 2888:2888
+      - 3888:3888
+
+  kafka:
+    image: debezium/kafka:${DEBEZIUM_KAFKA_VERSION}
+    ports:
+      - 9092:9092
+    links:
+      - zookeeper
+    environment:
+      - ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_MESSAGE_MAX_BYTES=5242880
+      - KAFKA_REPLICA_FETCH_MAX_BYTES=5242880
+      - KAFKA_MAX_REQUEST_SIZE=5242880
+      - KAFKA_FETCH_MESSAGE_MAX_BYTES=5242880
+
+  db:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+
+  flyway:
+    depends_on:
+      - db
+    image: flyway/flyway
+    command: -url=jdbc:postgresql://db/services repair migrate
+    volumes:
+      - ./docker/flyway/conf:/flyway/conf
+      - ./docker/flyway/migration:/flyway/sql/migration
+      - ./docker/flyway/migration-analytics:/flyway/sql/migration-analytics
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry
+    ports:
+      - 8181:8181
+      - 8081:8081
+    environment:
+      - SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL=zookeeper:2181
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:8081
+    links:
+      - zookeeper
+
+  connect:
+    build:
+      context: ./docker/connect
+      dockerfile: Dockerfile
+    ports:
+      - 8083:8083
+    links:
+      - kafka
+      - db
+      - schema-registry
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_PRODUCER_MAX_REQUEST_SIZE=5242880
+      - CONNECT_PRODUCER_MAX_REQUEST_SIZE=5242880
+      - CONNECT_CONSUMER_MAX_REQUEST_SIZE=5242880
+
+  ksql-server:
+    image: confluentinc/cp-ksql-server:5.0.1
+    hostname: ksql-server
+    container_name: ksql-server
+    depends_on:
+      - kafka
+      - connect
+    ports:
+      - "18088:8088"
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+      KSQL_KSQL_CONNECT_URL: http://connect:8083
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+  ksql-cli:
+    image: confluentinc/cp-ksql-cli:5.0.1
+    container_name: ksql-cli
+    hostname: ksql-cli
+    depends_on:
+      - ksql-server
+    entrypoint: /bin/sh
+    tty: true

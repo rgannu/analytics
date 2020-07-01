@@ -1,0 +1,11 @@
+#!/bin/bash
+cmd=$@
+
+echo "Waiting for rabbitmq to run ${cmd}"
+sleep 10
+rabbitmqctl status | while read LOGLINE
+do
+   [[ "${LOGLINE}" == "running_applications"* ]] && pkill -P $$ tail
+done
+echo "RabbitMQ started. Running ${cmd}"
+${cmd}

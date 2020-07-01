@@ -1,0 +1,5 @@
+:includedir: docs/home/modules/ROOT/pages
+:imagesdir: docs/home/modules/ROOT/assets/images
+
+include::{includedir}/index.adoc[]
+

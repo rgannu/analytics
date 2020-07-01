@@ -1,0 +1,21 @@
+site:
+  title: Analytics Docs
+  # the 404 page and sitemap files only get generated when the url property is set
+  url: https://analytics.utopian.com
+  start_page: home::index.adoc
+  robots: allow
+content:
+  sources:
+    - url: ./
+      start_path: docs
+      branches: [master]
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/master/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+output:
+  destinations:
+    - provider: fs
+      path: ./build/gen-docs-site
+      clean: false
+

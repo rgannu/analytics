@@ -1,0 +1,84 @@
+import groovy.json.JsonSlurper
+
+buildscript {
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+}
+
+plugins {
+    id "com.github.node-gradle.node" version "2.2.3"
+}
+
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'idea'
+    group = 'com.utopian.analytics'
+    version = '1.0'
+
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+}
+
+node {
+    // Version of node to use.
+    version = '12.16.2'
+
+    // Version of npm to use.
+    npmVersion = '6.14.5'
+
+    // Base URL for fetching node distributions (change if you have a mirror).
+    distBaseUrl = 'https://nodejs.org/dist'
+
+    // If true, it will download node using above parameters.
+    // If false, it will try to use globally installed node.
+    download = true
+
+    // Set the work directory for unpacking node
+    workDir = file("${buildDir}/nodejs")
+
+    // Set the work directory for NPM
+    npmWorkDir = file("${buildDir}/npm")
+
+    // Set the work directory for Yarn
+    yarnWorkDir = file("${buildDir}/yarn")
+
+    // Set the work directory where node_modules should be located
+    nodeModulesDir = file("${projectDir}")
+}
+
+defaultTasks 'buildAntoraDocs'
+
+task buildAntoraDocs(type: NodeTask) {
+    dependsOn npmInstall
+
+    group 'Documentation'
+    description 'Builds Antora docs'
+
+    script = file("${projectDir}/node_modules/@antora/cli/bin/antora")
+    args = ["--fetch", "--cache-dir=.cache/antora", "antora-playbook.yml"]
+    doLast {
+        copy {
+            from "${projectDir}/.nojekyll"
+            from "${projectDir}/web.config"
+            into "build/gen-docs-site"
+        }
+    }
+}
+
+task buildWebsiteArchive(type: Zip) {
+    dependsOn buildAntoraDocs
+    group 'Documentation'
+    description 'Builds website archive'
+
+    from fileTree('build/gen-docs-site')
+    include '**/*'
+    destinationDir(file('build'))
+}
+
+artifacts {
+    archives buildWebsiteArchive
+}

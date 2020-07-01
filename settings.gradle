@@ -1,0 +1,3 @@
+rootProject.name='analytics'
+
+include 'docs'

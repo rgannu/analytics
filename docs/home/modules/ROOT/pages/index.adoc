@@ -1,0 +1,235 @@
+## Analytics
+
+Project to test analytics.
+
+### Technologies
+* Zookeeper
+* Kafka Connect
+* Kafka
+* PostgreSQL DB
+* Flyway (DB creation)
+
+### Introduction
+The back-end data storage is Postgres database.
+There is a need to transfer data from the back-end DB to any other application/database for analytics purposes.
+PostgreSQL replication has advanced considerably in recent major releases, including continuous improvements to
+streaming replication and the addition of logical replication in PostgreSQL 10.
+The replication capability will help in transferring the complete database which is generally not
+needed for analytics purposes.
+
+What we need for analytics purposes are:
+
+- Capture all the database changes as events
+- Available in real-time
+- Data is always accessible, so they can meet the high-availability requirements for their applications.
+- Do not lose data (even restart of DB/DB not available for some period)
+- Transfer data in a secure manner
+
+https://debezium.io/[Debezium] is one of the tool available to capture database change events.
+Debezium is built upon the https://kafka.apache.org/[Apache Kafka project] and uses Kafka to
+transport the changes from one system to another.
+
+Debezium uses https://en.wikipedia.org/wiki/Change_data_capture[Change Data Capture](CDC) to
+capture the data and push it into Kafka. The advantage of this is that the source database remains
+untouched in the sense that we don’t have to add triggers or log tables. This is a huge advantage
+as triggers and log tables degrade performance.
+
+This can be used by us to transfer data to any analytics application in real-time.
+Also Debezium provides filtering capability such that we can capture fine-grained data
+which are needed for analytics rather than the entire dump (which is mostly not needed).
+
+KSQL provides a simple, interactive SQL interface for stream processing and can be run standalone and
+controlled remotely. KSQL utilizes the Kafka Streams API under the hood, meaning we can use it to
+do the same kind of declarative slicing and dicing we might do in JVM code using the Streams API.
+Then a native Kafka client, in whatever language our service is built in, can process the manipulated
+streams one message at a time. Whichever approach we take, these tools let us model business
+operations in an asynchronous, non-blocking, and coordination-free manner.
+
+### Demo Setup
+
+ifndef::imagesdir[:imagesdir: images]
+image::analytics-demo.png[Analytics Demo setup]
+
+
+### The Tools of the Trade: Windows, Tables & State Stores
+(Reference: https://www.confluent.jp/blog/building-a-microservices-ecosystem-with-kafka-streams-and-ksql/)
+
+Before we develop more complex microservice example let’s take a look more closely at some of the key elements of the Kafka Streams API. Kafka Streams needs its own local storage for a few different reasons. The most obvious is for buffering, as unlike in a traditional database—which keeps all historical data on hand—stream operations only need to collect events for some period of time. One that corresponds to how ‘late’ related messages may be with respect to one another.
+
+ifndef::imagesdir[:imagesdir: images]
+image::stream-stream-join.png[Local state backup]
+
+Let’s use a few variants on the email example. Imagine you want to send an email that confirms payment of a new order. We know that an Order and its corresponding Payment will turn up at around the same time, but we don’t know for sure which will come first or exactly how far apart they may be. We can put an upper limit on this though—let’s say an hour to be safe.
+
+To avoid doing all of this buffering in memory, Kafka Streams implements disk-backed State Stores to overflow the buffered streams to disk (think of this as a disk-resident hashtable). So each stream is buffered in this State Store, keyed by its message key. Thus, regardless of how late a particular event may be, the corresponding event can be quickly retrieved.
+
+Kafka Streams takes this same concept a step further to manage whole tables. Tables are a local manifestation of a complete topic—usually compacted—held in a state store by key. (You can also think of them as a stream with infinite retention.) In a microservices context, such tables are often used for enrichment. Say we decide to include Customer information in our Email logic. We can’t easily use a stream-stream join as there is no specific correlation between a user creating an Order and a user updating their Customer Information—that’s to say that there is no logical upper limit on how far apart these events may be. So this style of operation requires a table: the whole stream of Customers, from offset 0, replayed into the State Store inside the Kafka Streams API.
+
+The nice thing about using a KTable is it behaves like a table in a database. So when we join a stream of Orders to a KTable of Customers, there is no need to worry about retention periods, windows or any other such complexity. If the customer record exists, the join will just work.
+
+ifndef::imagesdir[:imagesdir: images]
+image::stream-table-join.png[Local state backup]
+
+There are actually two types of table in Kafka Streams: KTables and Global KTables. With just one instance of a service running, these effectively behave the same. However, if we scaled our service out—so it had, say, four instances running in parallel—we’d see slightly different behavior. This is because Global KTables are cloned: each service instance gets a complete copy of the entire table. Regular KTables are sharded: the dataset is spread over all service instances. So in short, Global KTables are easier to use, but they have scalability limits as they are cloned across machines, so use them for lookup tables (typically up to several gigabytes) that will fit easily on a machine’s local disk. Use KTables, and scale your services out, when the dataset is larger.
+
+ifndef::imagesdir[:imagesdir: images]
+image::local-state-backup.png[Local state backup]
+
+The final use of the State Store is to save information, just like we might write data to a regular database. This means we can save any information we wish and read it back again later, say after a restart. So we might expose an Admin interface to our Email Service which provides stats on emails that have been sent. We could store these stats in a state store and they’ll be saved locally, as well as being backed up to Kafka, inheriting all its durability guarantees.
+
+The minimum components required for skeleton deployment are
+
+- Kafka broker - consisting of a single https://zookeeper.apache.org/[Apache ZooKeeper] instance for cluster management and a
+single node of Kafka broker
+- Kafka Connect node - containing and configured to
+- Stream data from PostgresDB (Source)
+- Stream data from kafka to analytics (Sink)
+- Source Database
+- PostgresDB (UTM DB)
+- Sink
+- Any database Or
+- https://docs.confluent.io/current/connect/managing/connectors.html[Connectors] supported by Kafka connect.
+
+### Run the docker containers
+All the components are setup as docker containers for the ease of testing.
+
+- Start the docker containers
+```bash
+docker-compose up
+```
+
+- Next we are going to start the KSQL command shell. We will run a local engine in the CLI. Also please note --net parameter. This guarantees that KSQL container runs in the same network as Debezium containers and allows proper DNS resolution.
+
+  docker-compose exec ksql-cli ksql http://ksql-server:8088
+  First we will list all Kafka topics that exist in the broker:
+
+  ksql> LIST TOPICS;
+
+- To check the transfer of data from Source (Postgres) to Sink (Postgres).
+Login to `services` and `analytics` databases.
+```bash
+docker exec -it analytics_connect_1 /bin/bash
+psql -U services
+services =>\d
+
+docker exec -it analytics_connect_1 /bin/bash
+psql -U analytics
+analytics =>\d
+```
+- To check the transfer of data from Source (Postgres) to Sink (file sink).
+```bash
+docker exec -it analytics_connect_1 /bin/bash
+
+# This file will be appended with the data from kafka (as and when the data is updated)
+tail -f /tmp/kafka-file.txt
+```
+- Register kafka connectors. Upon registering the connectors, you will receive the data that already
+exists in the source tables (static data) to the destination. The file sink will also be appended
+with the static data.
+- The UnwrapFromEnvelope SMT is used in the source connector. This allows us to directly map fields from the after part of change records into KSQL statements. Without it, we would need to use EXTRACTJSONFIELD for each field to be extracted from the after part of messages.
+```bash
+# To register source connectors
+./register-connectors -i
+# To register sink connectors.
+./register-connectors -o
+```
+
+- Next we are going to start the KSQL command shell. We will run a local engine in the CLI. Also please note --net parameter.
+This guarantees that KSQL container runs in the same network as Debezium containers and allows proper DNS resolution.
+```bash 
+docker exec -it ksql-cli ksql http://ksql-server:8088
+```
+First we will list all Kafka topics that exist in the broker:
+```bash
+ksql> LIST TOPICS;
+
+ Kafka Topic                  | Partitions | Partition Replicas 
+----------------------------------------------------------------
+ _schemas                     | 1          | 1                  
+ dbanalytics.services.address | 1          | 1                  
+ dbanalytics.services.class   | 1          | 1                  
+ dbanalytics.services.school  | 1          | 1                  
+ dbanalytics.services.staff   | 1          | 1                  
+ dbanalytics.services.student | 1          | 1                  
+ default_ksql_processing_log  | 1          | 1                  
+ my_connect_configs           | 1          | 1                  
+ my_connect_offsets           | 25         | 1                  
+ my_connect_statuses          | 5          | 1                  
+----------------------------------------------------------------
+```
+The topics we are interested in are dbanalytics.services.*
+
+- KSQL processing by default starts with `latest` offsets. We want to process the events already in the topics so we switch processing from `earliest` offsets.
+```bash
+ksql> SET 'auto.offset.reset' = 'earliest';
+Successfully changed local property 'auto.offset.reset' from 'null' to 'earliest'
+```
+
+
+- Monitor kafka connectors
+```bash
+# To list kafka connectors
+curl -i  http://localhost:8083/connectors
+
+# To delete a kafka connector
+curl -i -X DELETE http://localhost:8083/connectors/unifly-source-connector
+
+# To restart
+curl -i -X POST http://localhost:8083/connectors/unifly-source-connector/restart
+
+```
+- Monitor the kafka topic for the messages. Note that we are storing AVRO messages and hence we are using `kafka-avro-console-consumer`.
+```bash
+docker exec -it analytics_schema-registry_1 /bin/bash
+
+# Start avro console consumer on any topic
+/usr/bin/kafka-avro-console-consumer --bootstrap-server kafka:9092 --from-beginning --property schema.registry.url=http://schema-registry:8081 --topic dbutm.services.manufacturer 
+```
+
+- Now do any CRUD operations in the source services database. This operation will result in the analytics database.
+```bash
+docker exec -it analytics_db_1 /bin/bash
+
+# Create some inserts, updates and deletes. After each operation monitor the analytics database 
+# to check whether it is updated or not
+insert into manufacturer(id, state, unique_identifier, version, name) values(default, 0, 'uuid_testme', 0, 'testme');
+insert into vehiculum(id, state, unique_identifier, version) values(1, 0, 'uuid_vehicle_testme', 1);	
+insert into trace(id, state, unique_identifier, version, properties) values(1, 0, 'uuid_testme', 1, '{"k1": "v1"}');
+
+update manufacturer set unique_identifier ='uuid_updated_testme1' where name = 'testme';
+update vehiculum set unique_identifier ='uuid_updated_vehicle_testme' where id = 1;
+
+delete from manufacturer where name = 'testme';
+delete from vehiculum where id = 1;
+``` 
+- ALTER the schema.
+---
+**NOTE**
+
+The column that you add needs to be backwards compatible.
+For example, we cannot add NOT NULL columns.
+---
+
+```bash
+alter table vehiculum add column new_column bigint;
+insert into vehiculum(id, state, unique_identifier, version, new_column) values(2, 0, 'uuid_vehicle_testme11', 1, 9999);
+```
+
+### References
+- Debezium - https://debezium.io/
+- Debezium github - https://github.com/debezium/debezium
+- wal2json - https://github.com/eulerto/wal2json
+- Kafka Connect - https://docs.confluent.io/current/connect/index.html
+- REST interface: https://docs.confluent.io/current/connect/references/restapi.html#connectors
+- Transformations: https://docs.confluent.io/current/connect/transforms/index.html
+- Connectors: https://docs.confluent.io/current/connect/managing/index.html
+- Blog
+- https://www.simple.com/blog/a-change-data-capture-pipeline-from-postgresql-to-kafka
+- Bottled water - https://www.confluent.io/blog/bottled-water-real-time-integration-of-postgresql-and-kafka/
+- Advantages of AVRO
+- https://www.oreilly.com/content/the-problem-of-managing-schemas/
+- http://blog.confluent.io/2015/02/25/stream-data-platform-2/?_ga=2.83432086.1219337222.1586335574-652590515.1586335574
+- http://martin.kleppmann.com/2012/12/05/schema-evolution-in-avro-protocol-buffers-thrift.html
+- Confluent blog posts
+- https://www.confluent.io/blog/simplest-useful-kafka-connect-data-pipeline-world-thereabouts-part-1/
+    

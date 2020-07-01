@@ -1,0 +1,32 @@
+{
+  "name": "source-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "wal2json",
+    "schema.refresh.mode": "columns_diff_exclude_unchanged_toast",
+    "slot.stream.params": "include-not-null=true",
+    "tasks.max": "1",
+    "database.hostname": "db",
+    "database.port": "5432",
+    "database.user": "services",
+    "database.password": "services",
+    "database.dbname": "services",
+    "database.server.name": "dbanalytics",
+    "database.history.kafka.bootstrap.servers": "kafka:9092",
+    "database.history.kafka.topic": "schema-changes.inventory",
+    "time.precision.mode": "connect",
+    "schema.whitelist": "services",
+    "table.whitelist": "services.school, services.staff, services.class, services.address, services.student",
+
+    "transforms":"unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "transforms.unwrap.add.fields": "op,table,lsn,source.ts_ms",
+
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter.schema.registry.url": "http://schema-registry:8081"
+  }
+}
