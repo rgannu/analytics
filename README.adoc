@@ -1,5 +1,9 @@
 :includedir: docs/home/modules/ROOT/pages
 :imagesdir: docs/home/modules/ROOT/assets/images
 
+ifdef::badges[]
+image:https://github.com/rgannu/analytics/workflows/Analytics/badge.svg?branch=master[Build status]
+endif::[]
+
 include::{includedir}/index.adoc[]
 
