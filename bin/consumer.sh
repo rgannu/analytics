@@ -9,4 +9,4 @@ done
 echo ${CLASSPATH}
 
 echo "Starting the consumer to consume AVRO messages from the AMQP broker ..."
-java -cp $CLASSPATH com.utopian.analytics.amqp.Consumer
+java -cp $CLASSPATH com.utopian.analytics.amqp.Consumer $@
