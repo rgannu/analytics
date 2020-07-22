@@ -1,5 +1,5 @@
 {
-  "name": "source-connector",
+  "name": "analytics-source-connector",
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
     "plugin.name": "wal2json",
@@ -13,20 +13,14 @@
     "database.dbname": "services",
     "database.server.name": "dbanalytics",
     "database.history.kafka.bootstrap.servers": "kafka:9092",
-    "database.history.kafka.topic": "schema-changes.inventory",
+    "database.history.kafka.topic": "schema-changes.dbanalytics",
     "time.precision.mode": "connect",
     "schema.whitelist": "services",
-    "table.whitelist": "services.school, services.staff, services.class, services.address, services.student",
-
-    "transforms":"unwrap",
-    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
-    "transforms.unwrap.drop.tombstones": "false",
-    "transforms.unwrap.delete.handling.mode": "rewrite",
-    "transforms.unwrap.add.fields": "op,table,lsn,source.ts_ms",
+    "table.whitelist": "services.test_table, services.postgis_table, services.school, services.staff, services.class, services.address, services.student",
 
     "key.converter": "io.confluent.connect.avro.AvroConverter",
     "value.converter": "io.confluent.connect.avro.AvroConverter",
-    "key.converter.schema.registry.url": "http://schema-registry:8081",
-    "value.converter.schema.registry.url": "http://schema-registry:8081"
+    "key.converter.schema.registry.url": "http://schema-registry:18081",
+    "value.converter.schema.registry.url": "http://schema-registry:18081"
   }
 }

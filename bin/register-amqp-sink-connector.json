@@ -1,0 +1,31 @@
+{
+  "name": "analytics-amqp-pub",
+  "config": {
+    "_comment": "Stream data to AMQP broker from Kafka topic using CamelRabbitmqSinkConnector",
+    "connector.class": "org.apache.camel.kafkaconnector.rabbitmq.CamelRabbitmqSinkConnector",
+
+    "tasks.max": "1",
+
+    "camel.sink.endpoint.hostname": "${file:/secrets/amqp.properties:hostname}",
+    "camel.sink.endpoint.portNumber": "${file:/secrets/amqp.properties:port}",
+    "camel.sink.path.exchangeName": "${file:/secrets/amqp.properties:exchange}",
+    "camel.sink.endpoint.exchangeType": "${file:/secrets/amqp.properties:exchange.type}",
+    "camel.sink.endpoint.autoDelete": "false",
+    "camel.sink.endpoint.routingKey": "${file:/secrets/amqp.properties:analytics.routing.key}",
+    "camel.sink.endpoint.allowCustomHeaders": "true",
+    "camel.sink.endpoint.lazyStartProducer": "true",
+
+    "camel.sink.endpoint.username": "${file:/secrets/amqp.properties:username}",
+    "camel.sink.endpoint.password": "${file:/secrets/amqp.properties:password}",
+
+    "_comment": "topics to consume from",
+    "topics": "dbanalytics.services.test_table",
+
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.debezium.converters.ByteBufferConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:18081",
+    "value.converter.schema.registry.url": "http://schema-registry:18081",
+    "key.converter.schemas.enable": "true",
+    "value.converter.schemas.enable": "true"
+  }
+}

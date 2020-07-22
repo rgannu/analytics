@@ -27,7 +27,7 @@ RUN git clone https://github.com/eulerto/wal2json -b master --single-branch \
 
 FROM postgres:9.6.17
 
-LABEL maintainer="Unifly"
+LABEL maintainer="rgannu"
 
 ENV POSTGIS_VERSION=2.5
 

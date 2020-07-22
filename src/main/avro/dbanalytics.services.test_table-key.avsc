@@ -1,0 +1,12 @@
+{
+   "type":"record",
+   "name":"Key",
+   "namespace":"dbanalytics.services.test_table",
+   "fields":[
+      {
+         "name":"id",
+         "type":"int"
+      }
+   ],
+   "connect.name":"dbanalytics.services.test_table.Key"
+}

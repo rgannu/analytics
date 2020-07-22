@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "Envelope",
+  "namespace": "dbanalytics.services.simple_table",
+  "fields": [
+    {
+      "name": "op",
+      "type": "string"
+    },
+    {
+      "name": "ts_ms",
+      "type": [
+        "null",
+        "long"
+      ],
+      "default": null
+    }
+  ],
+  "connect.name": "dbanalytics.services.simple_table.Envelope"
+}

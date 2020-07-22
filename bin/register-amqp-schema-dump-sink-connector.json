@@ -1,0 +1,29 @@
+{
+  "name": "analytics-schema-registry-pub",
+  "config": {
+    "_comment": "Stream data to AMQP broker from Kafka topic using CamelRabbitmqSinkConnector",
+    "connector.class": "org.apache.camel.kafkaconnector.rabbitmq.CamelRabbitmqSinkConnector",
+
+    "tasks.max": "1",
+
+    "camel.sink.endpoint.hostname": "${file:/secrets/amqp.properties:hostname}",
+    "camel.sink.endpoint.portNumber": "${file:/secrets/amqp.properties:port}",
+    "camel.sink.path.exchangeName": "${file:/secrets/amqp.properties:exchange}",
+    "camel.sink.endpoint.exchangeType": "${file:/secrets/amqp.properties:exchange.type}",
+    "camel.sink.endpoint.autoDelete": "false",
+    "camel.sink.endpoint.routingKey": "${file:/secrets/amqp.properties:schema.routing.key}",
+    "camel.sink.endpoint.allowCustomHeaders": "true",
+    "camel.sink.endpoint.lazyStartProducer": "true",
+
+    "camel.sink.endpoint.username": "${file:/secrets/amqp.properties:username}",
+    "camel.sink.endpoint.password": "${file:/secrets/amqp.properties:password}",
+
+    "_comment": "topics to consume from",
+    "topics": "kafka-schema-registry",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

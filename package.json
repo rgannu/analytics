@@ -1,13 +1,13 @@
 {
-  "name": "unifly-docs",
+  "name": "analytics-docs",
   "version": "0.0.1",
-  "description": "Unifly documentation project",
+  "description": "My documentation project",
   "private": true,
-  "homepage": "http://www.unifly.aero",
+  "homepage": "http://github.com/rgannu",
   "license": "?",
   "repository": {
     "type": "git",
-    "url": "http://github.com/unifly-aero/unifly-docs.git"
+    "url": "http://github.com/rgannu/rgannu-docs.git"
   },
   "dependencies": {
     "@antora/cli": "^2.3.1",

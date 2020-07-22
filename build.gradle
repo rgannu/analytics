@@ -1,5 +1,3 @@
-import groovy.json.JsonSlurper
-
 buildscript {
     repositories {
         jcenter()
@@ -9,11 +7,45 @@ buildscript {
 
 plugins {
     id "com.github.node-gradle.node" version "2.2.3"
+    id "com.commercehub.gradle.plugin.avro" version "0.9.1"
+}
+
+ext {
+    rabbitMqAmqpClientVersion = "5.9.0"
+    avroVersion = "1.9.2"
+    jacksonVersion = "2.10.2"
+    gsonVersion = "2.8.5"
+    kafkaScalaVersion = "2.12"
+    kafkaVersion = "2.5.0"
+    confluentVersion = "5.5.0"
+    curatorVersion = "5.1.0"
+    guavaVersion = "28.1-jre"
+    jsonSchemaVersion = "1.12.1"
+    mbknorJacksonVersion = "1.0.36"
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        // https://stackoverflow.com/questions/41691133/gradlegrettycould-not-find-jai-core-jar
+        url "https://repo1.maven.org/maven2"
+        artifactUrls  "http://maven.geotoolkit.org"
+    }
+    maven { url "https://packages.confluent.io/maven/" }
+
+    jcenter()
+    mavenCentral()
+}
+
+def javaProjects() {
+    subprojects.findAll { new File(it.projectDir, 'src').directory }
 }
 
 allprojects {
     apply plugin: 'java'
     apply plugin: 'idea'
+    apply plugin: "com.commercehub.gradle.plugin.avro-base"
+
     group = 'com.utopian.analytics'
     version = '1.0'
 
@@ -51,6 +83,48 @@ node {
 }
 
 defaultTasks 'buildAntoraDocs'
+
+configure(javaProjects()) {
+    apply plugin: 'java'
+}
+
+dependencies {
+    implementation "com.rabbitmq:amqp-client:${rabbitMqAmqpClientVersion}"
+    implementation "org.apache.avro:avro:${avroVersion}"
+    implementation "com.google.code.gson:gson:${gsonVersion}"
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+    implementation 'org.slf4j:slf4j-simple:1.7.30'
+    implementation "org.apache.kafka:kafka_${kafkaScalaVersion}:${kafkaVersion}"
+    implementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    implementation "org.apache.kafka:connect-api:${kafkaVersion}"
+    implementation "io.confluent:kafka-connect-avro-converter:${confluentVersion}"
+    implementation "org.apache.curator:curator-recipes:${curatorVersion}"
+    implementation 'org.apache.shiro:shiro-core:1.5.3'
+    implementation 'org.apache.avro:avro-compiler:1.10.0'
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    implementation "com.github.everit-org.json-schema:org.everit.json.schema:${jsonSchemaVersion}"
+    implementation "com.kjetland:mbknor-jackson-jsonschema_2.12:${mbknorJacksonVersion}"
+    implementation "tech.allegro.schema.json2avro:converter:0.2.9"
+    implementation "org.assertj:assertj-core:3.16.0"
+    implementation "org.testcontainers:testcontainers:1.12.3"
+
+    testImplementation('org.junit.jupiter:junit-jupiter-api:5.4.2')
+    testRuntime('org.junit.jupiter:junit-jupiter-engine:5.4.2')
+}
+
+def generateAvro = tasks.register("generateAvro", com.commercehub.gradle.plugin.avro.GenerateAvroJavaTask) {
+    source("src/avro")
+    outputDir = file("dest/avro")
+}
+
+tasks.named("compileJava").configure {
+    source(generateAvro)
+}
+
+task copyDependencies(type: Copy) {
+    from configurations.default
+    into "$buildDir/libs/dependencies"
+}
 
 task buildAntoraDocs(type: NodeTask) {
     dependsOn npmInstall

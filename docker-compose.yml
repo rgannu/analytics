@@ -1,5 +1,14 @@
 version: "3.7"
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    build:
+      context: ./docker/rabbitmq
+      dockerfile: Dockerfile
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
   zookeeper:
     hostname: zookeeper
     image: debezium/zookeeper:${DEBEZIUM_ZK_VERSION}
@@ -44,12 +53,12 @@ services:
   schema-registry:
     image: confluentinc/cp-schema-registry
     ports:
-      - 8181:8181
-      - 8081:8081
+      - 18181:8181
+      - 18081:8081
     environment:
       - SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL=zookeeper:2181
       - SCHEMA_REGISTRY_HOST_NAME=schema-registry
-      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:8081
+      - SCHEMA_REGISTRY_LISTENERS=http://schema-registry:18081
     links:
       - zookeeper
 
@@ -57,8 +66,12 @@ services:
     build:
       context: ./docker/connect
       dockerfile: Dockerfile
+      args:
+        customerEnv: dev
     ports:
-      - 8083:8083
+      - 18083:8083
+    volumes:
+      - ./docker/connect:/connect-volume
     links:
       - kafka
       - db
@@ -69,11 +82,19 @@ services:
       - CONFIG_STORAGE_TOPIC=my_connect_configs
       - OFFSET_STORAGE_TOPIC=my_connect_offsets
       - STATUS_STORAGE_TOPIC=my_connect_statuses
-      - INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - KAFKA_PRODUCER_MAX_REQUEST_SIZE=5242880
-      - CONNECT_PRODUCER_MAX_REQUEST_SIZE=5242880
-      - CONNECT_CONSUMER_MAX_REQUEST_SIZE=5242880
+      - KAFKA_PRODUCER_MAX_REQUEST_SIZE=6000000
+      - CONNECT_PRODUCER_MAX_REQUEST_SIZE=6000000
+      - CONNECT_CONSUMER_MAX_REQUEST_SIZE=6000000
+      - CONNECT_CONFIG_PROVIDERS=file
+      - CONNECT_CONFIG_PROVIDERS_FILE_CLASS=org.apache.kafka.common.config.provider.FileConfigProvider
+      - AMQP_HOSTNAME=rabbitmq
+      - AMQP_PORT=5672
+      - AMQP_USERNAME=guest
+      - AMQP_PASSWORD=guest
+      - AMQP_EXCHANGE=analytics-exchange
+      - AMQP_EXCHANGE_TYPE=topic
+      - AMQP_ANALYTICS_ROUTING_KEY=analytics
+      - AMQP_SCHEMA_ROUTING_KEY=analytics-schema
 
   ksql-server:
     image: confluentinc/cp-ksql-server:5.0.1
@@ -89,8 +110,8 @@ services:
       KSQL_BOOTSTRAP_SERVERS: kafka:9092
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
-      KSQL_KSQL_CONNECT_URL: http://connect:8083
-      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_KSQL_CONNECT_URL: http://connect:18083
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:18081
 
   ksql-cli:
     image: confluentinc/cp-ksql-cli:5.0.1
@@ -100,3 +121,11 @@ services:
       - ksql-server
     entrypoint: /bin/sh
     tty: true
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.1/16
