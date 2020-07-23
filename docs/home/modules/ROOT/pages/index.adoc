@@ -1,15 +1,15 @@
-## Analytics
+= Analytics
 
 Project to test analytics.
 
-### Technologies
+== Technologies
 * Zookeeper
 * Kafka Connect
 * Kafka
 * PostgreSQL DB
 * Flyway (DB creation)
 
-### Introduction
+== Introduction
 The back-end data storage is Postgres database.
 There is a need to transfer data from the back-end DB to any other application/database for analytics purposes.
 PostgreSQL replication has advanced considerably in recent major releases, including continuous improvements to
@@ -45,13 +45,13 @@ Then a native Kafka client, in whatever language our service is built in, can pr
 streams one message at a time. Whichever approach we take, these tools let us model business
 operations in an asynchronous, non-blocking, and coordination-free manner.
 
-### Demo Setup
+== Demo Setup
 
 ifndef::imagesdir[:imagesdir: images]
 image::analytics-demo.png[Analytics Demo setup]
 
 
-### The Tools of the Trade: Windows, Tables & State Stores
+== The Tools of the Trade: Windows, Tables & State Stores
 (Reference: https://www.confluent.jp/blog/building-a-microservices-ecosystem-with-kafka-streams-and-ksql/)
 
 Before we develop more complex microservice example let’s take a look more closely at some of the key elements of the Kafka Streams API. Kafka Streams needs its own local storage for a few different reasons. The most obvious is for buffering, as unlike in a traditional database—which keeps all historical data on hand—stream operations only need to collect events for some period of time. One that corresponds to how ‘late’ related messages may be with respect to one another.
@@ -90,13 +90,14 @@ single node of Kafka broker
 - Any database Or
 - https://docs.confluent.io/current/connect/managing/connectors.html[Connectors] supported by Kafka connect.
 
-### Run the docker containers
+== Run the docker containers
 All the components are setup as docker containers for the ease of testing.
 
 - Start the docker containers
-```bash
+[source, bash]
+----
 docker-compose up
-```
+----
 
 - Next we are going to start the KSQL command shell. We will run a local engine in the CLI. Also please note --net parameter. This guarantees that KSQL container runs in the same network as Debezium containers and allows proper DNS resolution.
 
@@ -107,7 +108,9 @@ docker-compose up
 
 - To check the transfer of data from Source (Postgres) to Sink (Postgres).
 Login to `services` and `analytics` databases.
-```bash
+
+[source, bash]
+----
 docker exec -it analytics_connect_1 /bin/bash
 psql -U services
 services =>\d
@@ -115,32 +118,43 @@ services =>\d
 docker exec -it analytics_connect_1 /bin/bash
 psql -U analytics
 analytics =>\d
-```
+----
+
 - To check the transfer of data from Source (Postgres) to Sink (file sink).
-```bash
+
+[source, bash]
+----
 docker exec -it analytics_connect_1 /bin/bash
 
 # This file will be appended with the data from kafka (as and when the data is updated)
 tail -f /tmp/kafka-file.txt
-```
+----
+
 - Register kafka connectors. Upon registering the connectors, you will receive the data that already
 exists in the source tables (static data) to the destination. The file sink will also be appended
 with the static data.
+
 - The UnwrapFromEnvelope SMT is used in the source connector. This allows us to directly map fields from the after part of change records into KSQL statements. Without it, we would need to use EXTRACTJSONFIELD for each field to be extracted from the after part of messages.
-```bash
+[source, bash]
+----
 # To register source connectors
 ./bin/register-connectors.sh -i
 # To register sink connectors.
 ./bin/register-connectors.sh -o
-```
+----
 
 - Next we are going to start the KSQL command shell. We will run a local engine in the CLI. Also please note --net parameter.
 This guarantees that KSQL container runs in the same network as Debezium containers and allows proper DNS resolution.
-```bash 
+
+[source, bash]
+----
 docker exec -it ksql-cli ksql http://ksql-server:8088
-```
-First we will list all Kafka topics that exist in the broker:
-```bash
+----
+
+- First we will list all Kafka topics that exist in the broker:
+
+[source, bash]
+----
 ksql> LIST TOPICS;
 
  Kafka Topic                  | Partitions | Partition Replicas 
@@ -156,18 +170,22 @@ ksql> LIST TOPICS;
  my_connect_offsets           | 25         | 1                  
  my_connect_statuses          | 5          | 1                  
 ----------------------------------------------------------------
-```
-The topics we are interested in are dbanalytics.services.*
+----
+
+- The topics we are interested in are dbanalytics.services.*
 
 - KSQL processing by default starts with `latest` offsets. We want to process the events already in the topics so we switch processing from `earliest` offsets.
-```bash
+
+[source, bash]
+----
 ksql> SET 'auto.offset.reset' = 'earliest';
 Successfully changed local property 'auto.offset.reset' from 'null' to 'earliest'
-```
+----
 
 
 - Monitor kafka connectors
-```bash
+[source, bash]
+----
 # To list kafka connectors
 curl -i  http://localhost:18083/connectors
 
@@ -176,30 +194,33 @@ curl -i -X DELETE http://localhost:18083/connectors/analytics-source-connector
 
 # To restart
 curl -i -X POST http://localhost:18083/connectors/analytics-source-connector/restart
+----
 
-```
 - The CDC events are generated as AVRO messages and they should be available immediately in the
 respective kafka topics. The kafka topic names are suffixed with the dbname and schema name.
 As we are storing AVRO messages and hence we are using `kafka-avro-console-consumer`.
 For example for the table `services.test_table` the corresponding kafka topic name is `dbanalytics.services.test_table`.
-```bash
+[source, bash]
+----
 docker exec -it analytics_schema-registry_1 \
     /usr/bin/kafka-avro-console-consumer \
       --bootstrap-server kafka:9092 \
       --from-beginning \
       --property schema.registry.url=http://schema-registry:8081 \
       --topic dbanalytics.services.test_table
-```
+----
 
 - Now do any CRUD operations in the source services database. This operation will result in the analytics database.
-```bash
+[source, bash]
+----
 docker exec -it analytics_db_1 /bin/bash
 
 # Create some inserts, updates and deletes. After each operation monitor the analytics database 
 # to check whether it is updated or not
 insert into test_table ...
 insert into postgis_table ...
-```
+----
+
 - ALTER the schema.
 ---
 **NOTE**
@@ -208,18 +229,20 @@ The column that you add needs to be backwards compatible.
 For example, we cannot add NOT NULL columns.
 ---
 
-```bash
+[source, bash]
+----
 alter table test_table add column new_column bigint;
 insert into test_table ...
-```
+----
 
 - The kafka schemas are available in the confluent kafka schema-registry. There are REST APIs
 available to retrieve them. Please refer to the confluent
 https://docs.confluent.io/current/connect/references/restapi.html#connectors[REST API kafka connector documentation]
 for the same. In case you want to publish these latest schemas to an AMQP end-point, you can do so using:
-```bash
+[source, bash]
+----
 docker exec -it analytics_connect_1 /connect-volume/bin/generate-schema.sh
-```
+----
 
 - Following is a simple java client code which retrieves messages from RabbitMQ queues
 
@@ -232,7 +255,7 @@ docker exec -it analytics_connect_1 /connect-volume/bin/generate-schema.sh
 ====
 [source,java]
 ----
-include::../../../../../src/main/java/com/utopian/analytics/amqp/Consumer.java[]
+include::{examplesdir}/analytics/src/main/java/com/utopian/analytics/amqp/Consumer.java[tags=consumer]
 ----
 ====
 
@@ -273,7 +296,7 @@ Decoded Specific AVRO message:
 {"before": null, "after": {"id": 4, "uuid": "21cc1b49-2e3a-443a-879d-1eeb95cc3d08", "version": 0}, "source": {"version": "1.2.0.Beta2", "connector": "postgresql", "name": "dbanalytics", "ts_ms": 1595431821598, "snapshot": "false", "db": "services", "schema": "services", "table": "test_table", "txId": 606, "lsn": 45567480, "xmin": null}, "op": "c", "ts_ms": 1595431821817, "transaction": null}
 ----
 
-# References
+== References
 - Debezium - https://debezium.io/
 - Debezium github - https://github.com/debezium/debezium
 - wal2json - https://github.com/eulerto/wal2json
