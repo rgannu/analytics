@@ -23,13 +23,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import joptsimple.AbstractOptionSpec;
 import joptsimple.ArgumentAcceptingOptionSpec;
-import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.util.RegexMatcher;
 import org.apache.avro.generic.GenericData.Record;
 
-public class Consumer {
+class Consumer {
 
     private static final String ANALYTICS_QUEUE_NAME = "analytics";
     private static final String SCHEMA_REGISTRY_QUEUE_NAME = "schema-registry";
@@ -37,7 +36,7 @@ public class Consumer {
     private static final String LOCALHOST = "localhost";
     private static final String USER_NAME = "guest";
     private static final String PASSWORD = "guest";
-    private Channel channel = null;
+    private final Channel channel;
     private Connection connection = null;
     private final String replyQueueName;
     private final String requestQueueName;
@@ -53,39 +52,27 @@ public class Consumer {
     private static KafkaAvroDeserializer avroDeserializer;
     private static KafkaAvroDeserializer specificAvroDeserializer;
 
-    public Consumer(String requestQueueName, String schemaRegistryBaseUrl)
-        throws Exception {
-        try {
-            ConnectionFactory factory = new ConnectionFactory();
-            factory.setHost(LOCALHOST);
-            factory.setUsername(USER_NAME);
-            factory.setPassword(PASSWORD);
+    public Consumer(String requestQueueName, String baseUrl) throws Exception {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost(LOCALHOST);
+        factory.setUsername(USER_NAME);
+        factory.setPassword(PASSWORD);
 
-            connection = factory.newConnection();
+        connection = factory.newConnection();
 
-            this.requestQueueName = requestQueueName;
-            connection = factory.newConnection();
-            channel = connection.createChannel();
+        this.requestQueueName = requestQueueName;
+        connection = factory.newConnection();
+        channel = connection.createChannel();
 
-            replyQueueName = channel.queueDeclare().getQueue();
-            initSchemaRegistry(schemaRegistryBaseUrl);
-        } finally {
-            if (null != channel) {
-                channel.close();
-            }
-            if (null != connection) {
-                connection.close();
-            }
-        }
+        replyQueueName = channel.queueDeclare().getQueue();
+        initSchemaRegistry(baseUrl);
     }
 
-    private void initSchemaRegistry(String schemaRegistryBaseUrl)
-        throws IOException, RestClientException {
-        schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryBaseUrl,
-            IDENTITY_MAP_CAPACITY);
+    private void initSchemaRegistry(String baseUrl) throws IOException, RestClientException {
+        schemaRegistry = new CachedSchemaRegistryClient(baseUrl, IDENTITY_MAP_CAPACITY);
 
         final ImmutableMap<String, Object> configs = ImmutableMap.of(
-            AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryBaseUrl
+            AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, baseUrl
         );
         avroSerializer = new KafkaAvroSerializer(schemaRegistry, configs);
         avroSerializer.register(SUBJECT_TEST_TABLE_KEY,
@@ -97,7 +84,7 @@ public class Consumer {
         final ImmutableMap<String, Object> specificDeserializerProps =
             ImmutableMap.of(
                 KafkaAvroDeserializerConfig.AUTO_REGISTER_SCHEMAS, true,
-                KafkaAvroDeserializerConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryBaseUrl,
+                KafkaAvroDeserializerConfig.SCHEMA_REGISTRY_URL_CONFIG, baseUrl,
                 KafkaAvroDeserializerConfig.SCHEMA_REFLECTION_CONFIG, true,
                 KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, "true"
             );
@@ -179,10 +166,10 @@ public class Consumer {
         return t;
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         OptionParser optionParser = new OptionParser();
         try {
-            ArgumentAcceptingOptionSpec<String> schemaRegistryBaseUrl = optionParser
+            ArgumentAcceptingOptionSpec<String> baseUrlOpt = optionParser
                 .acceptsAll(asList("u", "url")).withRequiredArg().ofType(String.class)
                 .describedAs("Schema Registry Base URL like http://<schema-registry-host>:<port>")
                 .withValuesConvertedBy(RegexMatcher.regex("^(http|https)\\:\\/\\/.*:\\d{4,6}"))
@@ -197,20 +184,15 @@ public class Consumer {
             if (options.has(helpOpt)) {
                 System.exit(0);
             }
-            String baseUrl = options.valueOf(schemaRegistryBaseUrl);
+            String baseUrl = options.valueOf(baseUrlOpt);
 
             Thread receiver1 = new Consumer(ANALYTICS_QUEUE_NAME, baseUrl).receive();
             Thread receiver2 = new Consumer(SCHEMA_REGISTRY_QUEUE_NAME, baseUrl).receive();
             receiver1.join();
             receiver2.join();
             System.out.println("All threads joined!!!");
-        } catch (OptionException e) {
-            System.out.println("Error parsing command line options:");
-            System.out.println(e.getMessage());
-            throw e;
         } catch (Exception e) {
             e.printStackTrace();
-            throw e;
         }
     }
 
