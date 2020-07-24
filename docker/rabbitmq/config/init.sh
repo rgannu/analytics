@@ -12,5 +12,5 @@ rabbitmqadmin declare queue name=analytics durable=false
 rabbitmqadmin declare queue name=schema-registry durable=false
 
 rabbitmqadmin declare binding source="analytics-exchange" destination_type="queue" destination="analytics" routing_key="analytics"
-rabbitmqadmin declare binding source="analytics-exchange" destination_type="queue" destination="schema-registry" routing_key="analytics-schema"
+rabbitmqadmin declare binding source="analytics-exchange" destination_type="queue" destination="schema-registry" routing_key="analytics-schema-registry"
 

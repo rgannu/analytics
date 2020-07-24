@@ -1,5 +1,5 @@
 {
-  "name": "analytics-amqp-pub",
+  "name": "analytics-amqp-sink-connector",
   "config": {
     "_comment": "Stream data to AMQP broker from Kafka topic using CamelRabbitmqSinkConnector",
     "connector.class": "org.apache.camel.kafkaconnector.rabbitmq.CamelRabbitmqSinkConnector",

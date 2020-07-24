@@ -94,7 +94,7 @@ services:
       - AMQP_EXCHANGE=analytics-exchange
       - AMQP_EXCHANGE_TYPE=topic
       - AMQP_ANALYTICS_ROUTING_KEY=analytics
-      - AMQP_SCHEMA_ROUTING_KEY=analytics-schema
+      - AMQP_SCHEMA_ROUTING_KEY=analytics-schema-registry
 
   ksql-server:
     image: confluentinc/cp-ksql-server:5.0.1
