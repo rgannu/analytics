@@ -1,22 +1,50 @@
 {
-  "name": "analytics-source-connector",
+  "name": "source-connector",
   "config": {
+    "_comment": "Push WAL messages to Kafka topic using PostgresConnector",
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+
+    "providers": "file",
+    "providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider",
+
     "plugin.name": "wal2json",
     "schema.refresh.mode": "columns_diff_exclude_unchanged_toast",
     "slot.stream.params": "include-not-null=true",
+
     "tasks.max": "1",
-    "database.hostname": "db",
-    "database.port": "5432",
-    "database.user": "services",
-    "database.password": "services",
-    "database.dbname": "services",
-    "database.server.name": "dbanalytics",
+
+    "database.hostname": "${file:/secrets/connect-source.properties:database.hostname}",
+    "database.port": "${file:/secrets/connect-source.properties:database.port}",
+    "database.user": "${file:/secrets/connect-source.properties:database.user}",
+    "database.password": "${file:/secrets/connect-source.properties:database.password}",
+    "database.dbname": "${file:/secrets/connect-source.properties:database.dbname}",
+    "database.server.name": "${file:/secrets/connect-source.properties:database.server.name}",
+
     "database.history.kafka.bootstrap.servers": "kafka:9092",
-    "database.history.kafka.topic": "schema-changes.dbanalytics",
+    "database.history.kafka.topic": "schema-changes.${file:/secrets/connect-source.properties:database.server.name}",
     "time.precision.mode": "connect",
-    "schema.whitelist": "services",
-    "table.whitelist": "services.test_table, services.postgis_table, services.school, services.staff, services.class, services.address, services.student",
+    "snapshot.mode": "exported",
+
+    "schema.include.list": "${file:/secrets/connect-source.properties:database.dbname}",
+
+    "topic.creation.groups": "analytics",
+    "topic.creation.default.partitions": 4,
+    "topic.creation.default.replication.factor": 1,
+    "topic.creation.analytics.include": "${file:/secrets/connect-source.properties:database.server.name}.${file:/secrets/connect-source.properties:database.dbname}.*",
+    "topic.creation.analytics.partitions": 4,
+    "topic.creation.analytics.replication.factor": 1,
+    "topic.creation.analytics.retention.ms": "${file:/secrets/connect-source.properties:retention.ms}",
+
+    "transforms": "unwrap,addSchemaMetadata",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "transforms.unwrap.add.headers": "op,table,lsn,txId",
+    "_comment": "Adding for each header the key prefix. For all the keys the prefix will be applied",
+    "transforms.unwrap.add.headers.prefix": "CamelHeader.",
+
+    "transforms.addSchemaMetadata.type": "com.utopian.analytics.transforms.SchemaMetaDataTransformer",
+    "transforms.addSchemaMetadata.schema.registry.url": "http://schema-registry:18081",
+    "transforms.addSchemaMetadata.add.headers.prefix": "CamelHeader.",
 
     "key.converter": "io.confluent.connect.avro.AvroConverter",
     "value.converter": "io.confluent.connect.avro.AvroConverter",

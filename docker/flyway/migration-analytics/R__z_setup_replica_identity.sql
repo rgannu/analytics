@@ -8,7 +8,7 @@ DECLARE
     rec record;
 BEGIN
   FOR rec IN
-    select table_name from information_schema.tables where table_schema = current_schema()
+    select table_name from information_schema.tables where table_schema = 'skybridge'
       and table_type = 'BASE TABLE'
   LOOP
     EXECUTE format('ALTER TABLE %I REPLICA IDENTITY FULL', rec.table_name);

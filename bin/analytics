@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# cross-platform version of gnu 'readlink -f'
+realpath=$(python -c 'import os; import sys; print (os.path.realpath(sys.argv[1]))' "$0")
+bin=`dirname "$realpath"`
+bin=`cd "$bin">/dev/null; pwd`
+
+INSTALL_DIR="/opt/utopian/analytics"
+SUDO=""
+
+if [ -d "$INSTALL_DIR" ]; then
+  SUDO="sudo"
+fi
+
+# Also take care in updating the _analytics_bash_completion_data.bash for bash-completion
+declare -A commands=( \
+  ["version"]="\t\t\t\tPrint the version" \
+  ["register|register-connectors"]="\t\tRegister the Kafka connectors" \
+  ["remove|remove-connectors"]="\t\tRemove the Kafka connectors" \
+  ["validate|validate-connectors"]="\t\tValidate the Kafka connectors" \
+  ["purge-prefix|purge-prefix-queues"]="\tPurge RabbitMQ queues for the given prefix (default: analytics queues)" \
+  ["purge-delete|purge-delete-queues"]="\tPurge and delete analytics RabbitMQ queues" \
+  ["list|list-queues"]="\t\t\tQuery and list analytics RabbitMQ queues" \
+  ["help"]="\t\t\t\t\tPrint usage" \
+)
+
+usage () {
+  echo ""
+  echo "Usage: `basename "$0"` <command>"
+  echo "where <command> an option from one of these categories:"
+  echo ""
+  for command in "${!commands[@]}"; do
+    echo -e "$command ${commands[$command]}";
+  done
+}
+
+# if no args specified, show usage
+if [[ $# = 0 ]]; then
+  usage
+  exit 0
+fi
+
+# get arguments
+COMMAND=$1
+shift
+
+SCRIPT=""
+
+if [[ "$COMMAND" == "version" ]]; then
+  SCRIPT="${bin}/version.sh"
+elif [[ "$COMMAND" == "register" || "$COMMAND" == "register-connectors" ]]; then
+  SCRIPT="${bin}/register-connectors.sh"
+elif [[ "$COMMAND" == "remove" || "$COMMAND" == "remove-connectors" ]]; then
+  SCRIPT="${bin}/remove-connectors.sh"
+elif [[ "$COMMAND" == "validate" || "$COMMAND" == "validate-connectors" ]]; then
+  SCRIPT="${bin}/validate-connectors.sh"
+elif [[ "$COMMAND" == "consumer" ]]; then
+  SCRIPT="${bin}/consumer.sh"
+elif [[ "$COMMAND" == "purge-prefix" || "$COMMAND" == "purge-prefix-queues" ]]; then
+  SCRIPT="${bin}/purge-prefix-queues.sh"
+elif [[ "$COMMAND" == "purge-delete" || "$COMMAND" == "purge-delete-queues" ]]; then
+  SCRIPT="${bin}/purge-delete-queues.sh"
+elif [[ "$COMMAND" == "list" || "$COMMAND" == "list-queues" ]]; then
+  SCRIPT="${bin}/list-queues.sh"
+elif [[ "$COMMAND" == "help" ]]; then
+  usage
+else
+  echo "Unknown command given."
+  usage
+  exit 1
+fi
+
+if [ "${SCRIPT}" != "" ]; then
+  $SCRIPT $@
+fi
+
+if [[ $? != 0 ]]; then
+  exit 1;
+fi
+
+exit 0

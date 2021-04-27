@@ -1,0 +1,197 @@
+import java.text.SimpleDateFormat
+
+buildscript {
+    apply from: "../gradle/repositories.gradle"
+}
+
+plugins {
+    id "com.github.davidmc24.gradle.plugin.avro"
+}
+
+ext {
+    artifactoryURL = "https://artifactory.unifly.aero"
+    buildVersionFileName = "version.properties"
+    commitId = project.hasProperty('commitId') ? commitId : null
+}
+
+apply plugin: 'com.github.davidmc24.gradle.plugin.avro-base'
+
+repositories {
+    mavenLocal()
+    maven {
+        url artifactoryURL + '/artifactory/local_repos'
+        credentials {
+            username = "${artifactoryUser}"
+            password = "${artifactoryPassword}"
+        }
+    }
+    maven {
+        url artifactoryURL + '/artifactory/remote-repos'
+        credentials {
+            username = "${artifactoryUser}"
+            password = "${artifactoryPassword}"
+        }
+    }
+    maven {
+        url artifactoryURL + '/artifactory/libs-release-local'
+        credentials {
+            username = "${artifactoryUser}"
+            password = "${artifactoryPassword}"
+        }
+    }
+    maven {
+        url artifactoryURL + '/artifactory/libs-snapshot-local'
+        credentials {
+            username = "${artifactoryUser}"
+            password = "${artifactoryPassword}"
+        }
+    }
+    maven {
+        url 'http://packages.confluent.io/maven'
+    }
+    jcenter()
+}
+
+dependencies {
+    implementation "org.slf4j:slf4j-log4j12:${slf4jVersion}"
+    implementation "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    implementation "com.rabbitmq:amqp-client:${rabbitMqAmqpClientVersion}"
+    implementation "org.apache.avro:avro:${avroVersion}"
+    implementation "io.debezium:debezium-core:${debeziumVersion}"
+    implementation "io.debezium:debezium-connector-postgres:${debeziumVersion}"
+    implementation "org.assertj:assertj-core:${assertjVersion}"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-joda:${avroJacksonVersion}"
+    implementation "org.testcontainers:testcontainers:1.12.3"
+
+    implementation "org.apache.kafka:connect-api:${kafkaVersion}"
+    implementation "io.confluent:kafka-connect-avro-converter:${confluentVersion}"
+    implementation "io.confluent:kafka-streams-avro-serde:${confluentVersion}"
+    implementation "io.confluent:kafka-schema-registry:${confluentVersion}"
+
+    implementation "org.assertj:assertj-core:${assertjVersion}"
+
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${jupiterVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${jupiterVersion}"
+    testImplementation "net.javacrumbs.json-unit:json-unit-assertj:${assertjJsonUnitVersion}"
+}
+
+task determineCommitId {
+    def takeFromHash = 16
+    if (commitId) {
+        commitId = commitId.take(takeFromHash)
+    } else if (file("$rootDir/.git/HEAD").exists()) {
+        def headRef = file("$rootDir/.git/HEAD").text
+        if (headRef.contains('ref: ')) {
+            headRef = headRef.replaceAll('ref: ', '').trim()
+            if (file("$rootDir/.git/$headRef").exists()) {
+                commitId = file("$rootDir/.git/$headRef").text.trim().take(takeFromHash)
+            }
+        } else {
+            commitId = headRef.trim().take(takeFromHash)
+        }
+    } else {
+        commitId = "unknown"
+    }
+}
+
+task createVersionFile(dependsOn: determineCommitId) {
+    ext.receiptFile = file("$buildDir/$buildVersionFileName")
+    outputs.file receiptFile
+    outputs.upToDateWhen { false }
+    doLast {
+        def data = [
+                commitId: commitId,
+                version : version,
+        ]
+
+        receiptFile.parentFile.mkdirs()
+        def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
+        receiptFile.setText(content, "ISO-8859-1")
+    }
+}
+
+jar {
+    dependsOn createVersionFile
+    from("$buildDir") {
+        include "$buildVersionFileName"
+    }
+    dependsOn determineCommitId
+    manifest {
+        attributes("Implementation-Title": rootProject.name,
+                "Implementation-Version": rootProject.version,
+                "Implementation-Vendor": "Utopian",
+                "description": "Analytics library to send AMQP messages.",
+                "Main-Class": "com.utopian.analytics.amqp.Consumer",
+                "Build-Date": new SimpleDateFormat("yyyy-MM-dd").format(new Date()),
+                "Build-Gradle": project.gradle.gradleVersion,
+                "Commit-Id": commitId
+        )
+    }
+}
+
+task copyResourcesForDoc(type: Copy) {
+    from fileTree(dir: 'src/test/resources', includes: ['**/*.json']).files
+    into "../docs/modules/ROOT/examples/json"
+}
+
+task copyJavaFilesForDoc(type: Copy) {
+    from fileTree(dir: 'src', includes: ['**/Consumer.java', '**/AnalyticsSerde.java', '**/Analytics*SerdeTest.java', '**/PostgisGeometry.java']).files
+    into "../docs/modules/ROOT/examples/java"
+    expand([
+            symlinkText: "DO NOT EDIT THIS FILE. EDIT THE ACTUAL SOURCE FILE"
+    ])
+}
+
+task copyDockerComposeConfigFilesForDoc(type: Copy) {
+    from fileTree(dir: '../docker', includes: ['db.env', 'connect.env', 'kafdrop.env', 'kafka.env', 'schema-registry.env']).files
+    into "../docs/modules/ROOT/examples/docker/config"
+}
+
+task copyDockerComposeEnvFilesForDoc(type: Copy) {
+    from fileTree(dir: '../', includes: ['.env']).files
+    into "../docs/modules/ROOT/examples/docker/config"
+    rename('.env', 'env.sample')
+}
+
+task copyDockerComposeFlywayFilesForDoc(type: Copy) {
+    from fileTree(dir: '../docker/flyway', includes: ['Dockerfile']).files
+    from('../docker/flyway/analytics-testdata') {
+        into 'analytics-testdata'
+    }
+    into "../docs/modules/ROOT/examples/docker/flyway"
+    rename('Dockerfile', 'Dockerfile.sample')
+}
+
+task copyDockerComposePostgresFilesForDoc(type: Copy) {
+    from fileTree(dir: '../docker/postgres/docker-entrypoint-initdb.d', includes: ['*.sh']).files
+    into "../docs/modules/ROOT/examples/docker/postgres/docker-entrypoint-initdb.d"
+}
+
+task copyDockerComposeRabbitMqFilesForDoc(type: Copy) {
+    from fileTree(dir: '../docker/rabbitmq', includes: ['Dockerfile', 'supervisor.sh']).files
+    from('../docker/rabbitmq/config') {
+        into 'config'
+    }
+    into "../docs/modules/ROOT/examples/docker/rabbitmq"
+    rename('Dockerfile', 'Dockerfile.sample')
+    rename('wait-for-rabbitmq', 'wait-for-rabbitmq.sample')
+}
+
+task copyJsonFilesForDoc(type: Copy) {
+    from fileTree(dir: '../', includes: ['bin/register-amqp-sink-connector.json', 'bin/register-source-postgres.json']).files
+    into "../docs/modules/ROOT/examples/json"
+}
+
+task copyDockerComposeFilesForDoc {
+    dependsOn copyDockerComposeConfigFilesForDoc, copyDockerComposeEnvFilesForDoc,
+            copyDockerComposeFlywayFilesForDoc, copyDockerComposePostgresFilesForDoc,
+            copyDockerComposeRabbitMqFilesForDoc
+}
+
+task buildDocs() {
+    dependsOn copyJavaFilesForDoc, copyResourcesForDoc, copyJsonFilesForDoc, copyDockerComposeFilesForDoc
+}
+
+build.dependsOn shadowJar, buildDocs

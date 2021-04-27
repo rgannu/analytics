@@ -36,9 +36,12 @@ while true ; do
   esac
 done
 
+echo "======================================================"
 echo "URL:${BASE_URL}"
 echo "Broker List:${BROKER_LIST}"
 echo "Topic:${TOPIC}"
+echo "Storing the AVRO files in the directory: ${OUTPUT_DIR}"
+echo "======================================================"
 
 if [[ "${BASE_URL}" == "" ]]; then
   echo "Incorrect options provided. ${USAGE_MSG}"
@@ -51,23 +54,29 @@ if ([[ "${BROKER_LIST}" == "" ]] && [[ "${TOPIC}" != "" ]]) ||
   exit 1
 fi
 
-for VAR in `curl "${BASE_URL}/subjects" | jq '.[]' | sed -e 's/"//g'`
+for SUBJECT in `curl "${BASE_URL}/subjects" | jq '.[]' | sed -e 's/"//g'`
 do
-  SCHEMA_URL="${BASE_URL}/subjects/${VAR}/versions/latest/schema"
-  echo "Retrieving Schema of ${VAR} from URL:${SCHEMA_URL}"
-  SCHEMA=`curl ${SCHEMA_URL} | jq '.'`
-  echo ${SCHEMA} > ${OUTPUT_DIR}/${VAR}-schema.json
+  if [[ "${SUBJECT}" =~ ^dbanalytics\.skybridge.* ]]; then
+    for VERSION in `curl "${BASE_URL}/subjects/${SUBJECT}/versions" | jq '.[]'`
+    do
+      SCHEMA_ID=`curl "${BASE_URL}/subjects/${SUBJECT}/versions/${VERSION}" | jq '.id'`
+      SCHEMA_URL="${BASE_URL}/subjects/${SUBJECT}/versions/${VERSION}/schema"
+      echo "Retrieving Schema of ${SUBJECT} from URL:${SCHEMA_URL}"
+      SCHEMA=`curl ${SCHEMA_URL}`
+      echo ${SCHEMA} | jq '.' > ${OUTPUT_DIR}/${SUBJECT}-V${VERSION}-SID${SCHEMA_ID}.avsc
+    done
+  fi
 done
 
-
 if [[ ${TOPIC} != "" ]]; then
-  for jsonFile in `ls ${OUTPUT_DIR}/*.json`
+  for avscFile in `ls ${OUTPUT_DIR}/*.avsc`
   do
-    KEY=`echo ${jsonFile} | awk -F "/" '{print $5}' | sed -e 's/\.json//g' -e 's/\./_/g'`
-    VALUE=`cat ${jsonFile}`
+#     KEY=`echo ${avscFile} | awk -F "/" '{print $4}' | sed -e 's/\.avsc//g' -e 's/\./_/g' | awk -F '-V[0-9]*-SID[0-9]*' '{print $1}'`
+    KEY=`echo ${avscFile} | awk -F "/" '{print $4}' | sed -e 's/\.avsc//g' -e 's/\./_/g'`
+    VALUE=`cat ${avscFile} | paste -sd "" -`
     echo "Producing AVRO message schema to the kafka topic:${TOPIC} with KEY:${KEY} and JSON schema as value"
-#    echo "KEY:${KEY}"
-#    echo "VALUE:${VALUE}"
+#     echo "KEY:${KEY}"
+#     echo "VALUE:${VALUE}"
     echo "${KEY}:${VALUE}" | /kafka/bin/kafka-console-producer.sh \
       --broker-list ${BROKER_LIST} \
       --topic ${TOPIC} \

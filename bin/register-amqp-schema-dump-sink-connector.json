@@ -4,16 +4,24 @@
     "_comment": "Stream data to AMQP broker from Kafka topic using CamelRabbitmqSinkConnector",
     "connector.class": "org.apache.camel.kafkaconnector.rabbitmq.CamelRabbitmqSinkConnector",
 
+    "providers": "file",
+    "providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider",
+
     "tasks.max": "1",
 
     "camel.sink.endpoint.hostname": "${file:/secrets/amqp.properties:hostname}",
     "camel.sink.endpoint.portNumber": "${file:/secrets/amqp.properties:port}",
-    "camel.sink.path.exchangeName": "${file:/secrets/amqp.properties:exchange}",
-    "camel.sink.endpoint.exchangeType": "${file:/secrets/amqp.properties:exchange.type}",
+    "camel.sink.path.exchangeName": "${file:/secrets/amqp.properties:schema.exchange}",
+    "camel.sink.endpoint.exchangeType": "${file:/secrets/amqp.properties:schema.exchange.type}",
+    "camel.sink.endpoint.declare": "false",
     "camel.sink.endpoint.autoDelete": "false",
     "camel.sink.endpoint.routingKey": "${file:/secrets/amqp.properties:schema.routing.key}",
     "camel.sink.endpoint.allowCustomHeaders": "true",
     "camel.sink.endpoint.lazyStartProducer": "true",
+
+    "camel.component.rabbitmq.guaranteed-deliveries": "true",
+    "camel.component.rabbitmq.publisher-acknowledgements": "true",
+    "camel.component.rabbitmq.publisher-acknowledgements-timeout": 10000,
 
     "camel.sink.endpoint.username": "${file:/secrets/amqp.properties:username}",
     "camel.sink.endpoint.password": "${file:/secrets/amqp.properties:password}",

@@ -1,0 +1,31 @@
+{
+  "name": "json-file-sink-connector",
+  "config": {
+    "_comment": "Stream data to file from Kafka topic using CamelLogSinkConnector",
+    "connector.class": "org.apache.camel.kafkaconnector.file.CamelFileSinkConnector",
+
+    "providers": "file",
+    "providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider",
+
+    "tasks.max": "1",
+
+    "_comment": "--- File specific configuration here ---",
+    "_comment": "If true, mask sensitive information like password or passphrase in the log",
+    "camel.sink.contentLogLevel": "DEBUG",
+
+    "camel.sink.endpoint.level": "TRACE",
+    "camel.sink.endpoint.showFiles": "true",
+    "camel.sink.endpoint.showCaughtException": "true",
+    "camel.sink.endpoint.showException": "true",
+    "camel.sink.endpoint.showStackTrace": "true",
+    "camel.sink.url": "file:/tmp/?fileName=kafkaconnect-json.txt&fileExist=Append",
+
+    "_comment": "Which topic(s) to write data from",
+    "topics": "kafka-schema-registry",
+
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

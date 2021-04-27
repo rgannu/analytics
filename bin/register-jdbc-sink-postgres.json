@@ -4,6 +4,9 @@
     "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
     "tasks.max": "1",
 
+    "providers": "file",
+    "providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider",
+
     "_comment": "target database connection details",
     "connection.url":  "jdbc:postgresql://db:5432/analytics",
     "connection.user": "analytics",
@@ -13,7 +16,7 @@
     "_comment": "transformation doc: http://kafka.apache.org/documentation.html#connect_transforms",
     "transforms":"dropPrefix, unwrap",
     "transforms.dropPrefix.type":"org.apache.kafka.connect.transforms.RegexRouter",
-    "transforms.dropPrefix.regex":"^dbanalytics.services.(.*)",
+    "transforms.dropPrefix.regex":"^${file:/secrets/connect-source.properties:database.server.name}.${file:/secrets/connect-source.properties:database.dbname}.(.*)",
     "transforms.dropPrefix.replacement":"$1",
     "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
     "transforms.unwrap.drop.tombstones": "false",
@@ -34,7 +37,7 @@
     "pk.mode": "record_key",
 
     "_comment": "topics to consume from",
-    "topics.regex": "^dbanalytics.services.(.*)",
+    "topics.regex": "^${file:/secrets/connect-source.properties:database.server.name}.${file:/secrets/connect-source.properties:database.dbname}.(.*)",
 
     "_comment": "table name format",
     "_comment": "A format string for the destination table name, which may contain '${topic}' as a placeholder for the originating topic name. For example, ``kafka_${topic}`` for the topic 'orders' will map to the table name 'kafka_orders'.",

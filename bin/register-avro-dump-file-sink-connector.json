@@ -1,0 +1,33 @@
+{
+  "name": "avro-dump-file-sink-connector",
+  "config": {
+    "_comment": "Stream data to file from Kafka topic using CamelLogSinkConnector",
+    "connector.class": "org.apache.camel.kafkaconnector.file.CamelFileSinkConnector",
+
+    "providers": "file",
+    "providers.file.class": "org.apache.kafka.common.config.provider.FileConfigProvider",
+
+    "tasks.max": "1",
+
+    "_comment": "--- File specific configuration here ---",
+    "_comment": "If true, mask sensitive information like password or passphrase in the log",
+    "camel.sink.contentLogLevel": "DEBUG",
+
+    "camel.sink.endpoint.level": "TRACE",
+    "camel.sink.endpoint.showFiles": "true",
+    "camel.sink.endpoint.showCaughtException": "true",
+    "camel.sink.endpoint.showException": "true",
+    "camel.sink.endpoint.showStackTrace": "true",
+    "camel.sink.url": "file:/tmp/?fileName=analytics.avro&fileExist=Append",
+
+    "_comment": "Which topic(s) to write data from",
+    "topics.regex": "^${file:/secrets/connect-source.properties:database.server.name}.${file:/secrets/connect-source.properties:database.dbname}.(.*)",
+
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter": "io.debezium.converters.ByteBufferConverter",
+    "key.converter.schema.registry.url": "http://schema-registry:18081",
+    "value.converter.schema.registry.url": "http://schema-registry:18081",
+    "key.converter.schemas.enable": "true",
+    "value.converter.schemas.enable": "true"
+  }
+}

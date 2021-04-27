@@ -1,0 +1,3 @@
+\i V3_0_0__mytest_simple_data_20200806_0900.sql
+\i V3_0_0__mytest_schema_version_data_20210330_0900.sql
+\i V3_0_0__mytest_postgis_data_20200806_0900.sql

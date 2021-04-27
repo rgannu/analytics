@@ -1,3 +1,31 @@
+pluginManagement {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url 'https://artifactory.unifly.aero/artifactory/local_repos'
+            credentials {
+                username = "${artifactoryUser}"
+                password = "${artifactoryPassword}"
+            }
+        }
+
+        maven {
+            url 'https://artifactory.unifly.aero/artifactory/remote-repos'
+            credentials {
+                username = "${artifactoryUser}"
+                password = "${artifactoryPassword}"
+            }
+        }
+        gradlePluginPortal()
+        jcenter()
+        mavenCentral()
+    }
+}
+
 rootProject.name='analytics'
 
 include 'docs'
+include 'core'
+
